@@ -25,6 +25,7 @@
 #include "text.hpp"
 #include "sort_pairs.hpp"
 #include "globals.hpp"
+#include "annotations.hpp"
 
 #ifdef MFEM_USE_STRUMPACK
 #include <StrumpackConfig.hpp> // STRUMPACK_USE_PTSCOTCH, etc.
@@ -32,6 +33,7 @@
 
 #include <iostream>
 #include <map>
+
 
 using namespace std;
 
@@ -96,6 +98,8 @@ void GroupTopology::ProcToLProc()
 
 void GroupTopology::Create(ListOfIntegerSets &groups, int mpitag)
 {
+   CALI_MARK_COMM_REGION_BEGIN("All communication");
+
    groups.AsTable(group_lproc); // group_lproc = group_proc
 
    Table group_mgroupandproc;
@@ -228,20 +232,26 @@ void GroupTopology::Create(ListOfIntegerSets &groups, int mpitag)
    recv_requests = MPI_REQUEST_NULL;
    for (int nbr = 1; nbr < lproc_cgroup.Size(); nbr++)
    {
+      CALI_MARK_COMM_REGION_BEGIN("send and receive");
       const int send_row = 2*(nbr-1);
       const int recv_row = send_row+1;
       const int send_size = buffer.RowSize(send_row);
       const int recv_size = buffer.RowSize(recv_row);
       if (send_size > 0)
       {
+         CALI_MARK_COMM_REGION_BEGIN("send");
          MPI_Isend(buffer.GetRow(send_row), send_size, MPI_INT, lproc_proc[nbr],
                    mpitag, MyComm, &send_requests[nbr-1]);
+	 CALI_MARK_COMM_REGION_END("send");
       }
       if (recv_size > 0)
       {
+	 CALI_MARK_COMM_REGION_BEGIN("recieve");
          MPI_Irecv(buffer.GetRow(recv_row), recv_size, MPI_INT, lproc_proc[nbr],
                    mpitag, MyComm, &recv_requests[nbr-1]);
+         CALI_MARK_COMM_REGION_END("recieve");
       }
+      CALI_MARK_COMM_REGION_END("send and receive");
    }
 
    if (recv_requests.Size() > 0)
@@ -266,7 +276,8 @@ void GroupTopology::Create(ListOfIntegerSets &groups, int mpitag)
 
    MPI_Waitall(send_requests.Size(), send_requests.GetData(),
                MPI_STATUSES_IGNORE);
-
+     
+   CALI_MARK_COMM_REGION_BEGIN("All communication");
    // debug barrier: MPI_Barrier(MyComm);
 }
 
@@ -720,6 +731,7 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
    {
       case byGroup: // ***** Communication by groups *****
       {
+	 CALI_MARK_COMM_REGION_BEGIN("BcastBegin byGroup");
          T *buf;
          if (layout != 1)
          {
@@ -742,6 +754,7 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
 
             if (!gtopo.IAmMaster(gr)) // we are not the master
             {
+	       CALI_MARK_COMM_REGION_BEGIN("BcastBegin byGroup receive");
                MPI_Irecv(buf,
                          nldofs,
                          MPITypeMap<T>::mpi_type,
@@ -751,6 +764,7 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
                          &requests[request_counter]);
                request_marker[request_counter] = gr;
                request_counter++;
+	       CALI_MARK_COMM_REGION_END("BcastBegin byGroup receive");
             }
             else // we are the master
             {
@@ -762,6 +776,7 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
                const int *nbs = gtopo.GetGroup(gr);
                for (int i = 0; i < gs; i++)
                {
+	          CALI_MARK_COMM_REGION_BEGIN("BcastBegin byGroup send");
                   if (nbs[i] != 0)
                   {
                      MPI_Isend(buf,
@@ -774,15 +789,18 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
                      request_marker[request_counter] = -1; // mark as send req.
                      request_counter++;
                   }
+		  CALI_MARK_COMM_REGION_END("BcastBegin byGroup send");
                }
             }
             buf += nldofs;
          }
+         CALI_MARK_COMM_REGION_END("BcastBegin byGroup");
          break;
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
       {
+         CALI_MARK_COMM_REGION_BEGIN("BcastBegin byNeighbor");
          group_buf.SetSize(group_buf_size*sizeof(T));
          T *buf = (T *)group_buf.GetData();
          for (int nbr = 1; nbr < nbr_send_groups.Size(); nbr++)
@@ -790,6 +808,7 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
             const int num_send_groups = nbr_send_groups.RowSize(nbr);
             if (num_send_groups > 0)
             {
+	       CALI_MARK_COMM_REGION_BEGIN("BcastBegin byNeighbor send");
                // Possible optimization:
                //    if (num_send_groups == 1) and (layout == 1) then we do not
                //    need to copy the data in order to send it.
@@ -808,11 +827,13 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
                          &requests[request_counter]);
                request_marker[request_counter] = -1; // mark as send request
                request_counter++;
+	       CALI_MARK_COMM_REGION_END("BcastBegin byNeighbor send");
             }
 
             const int num_recv_groups = nbr_recv_groups.RowSize(nbr);
             if (num_recv_groups > 0)
             {
+	       CALI_MARK_COMM_REGION_BEGIN("BcastBegin byNeighbor receive");
                // Possible optimization (requires interface change):
                //    if (num_recv_groups == 1) and the (output layout == 1) then
                //    we can receive directly in the output buffer; however, at
@@ -834,9 +855,11 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
                request_counter++;
                buf_offsets[nbr] = buf - (T*)group_buf.GetData();
                buf += recv_size;
+	       CALI_MARK_COMM_REGION_END("BcastBegin byNeighbor receive");
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
+	 CALI_MARK_COMM_REGION_END("BcastBegin byNeighbor");
          break;
       }
    }
@@ -855,6 +878,7 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
    switch (mode)
    {
       case byGroup: // ***** Communication by groups *****
+      CALI_MARK_COMM_REGION_BEGIN("BcastEnd byGroup");
       {
          if (layout == 1)
          {
@@ -875,11 +899,14 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
                CopyGroupFromBuffer(buf, ldata, gr, layout);
             }
          }
+	 CALI_MARK_COMM_REGION_END("BcastEnd byGroup");
+
          break;
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
       {
+	 CALI_MARK_COMM_REGION_BEGIN("BcastEnd byNeighbor");
          // copy the received data from the buffer to ldata, as it arrives
          int idx;
          while (MPI_Waitany(num_requests, requests, &idx, MPI_STATUS_IGNORE),
@@ -899,6 +926,7 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
                }
             }
          }
+	 CALI_MARK_COMM_REGION_END("BcastEnd byNeighbor");
          break;
       }
    }
@@ -921,6 +949,7 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
    {
       case byGroup: // ***** Communication by groups *****
       {
+	 CALI_MARK_COMM_REGION_BEGIN("ReduceBegin byGroup");
          for (int gr = 1; gr < group_ldof.Size(); gr++)
          {
             const int nldofs = group_ldof.RowSize(gr);
@@ -929,6 +958,7 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
 
             if (!gtopo.IAmMaster(gr)) // we are not the master
             {
+	       CALI_MARK_COMM_REGION_BEGIN("ReduceBegin byGroup send");
                const int layout = 0;
                CopyGroupToBuffer(ldata, buf, gr, layout);
                MPI_Isend(buf,
@@ -941,9 +971,11 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
                request_marker[request_counter] = -1; // mark as send request
                request_counter++;
                buf += nldofs;
+	       CALI_MARK_COMM_REGION_END("ReduceBegin byGroup send");
             }
             else // we are the master
             {
+	       CALI_MARK_COMM_REGION_BEGIN("ReduceBegin byGroup recieve");
                const int  gs  = gtopo.GetGroupSize(gr);
                const int *nbs = gtopo.GetGroup(gr);
                buf_offsets[gr] = buf - (T *)group_buf.GetData();
@@ -963,19 +995,23 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
                      buf += nldofs;
                   }
                }
+	       CALI_MARK_COMM_REGION_END("ReduceBegin byGroup recieve");
             }
          }
+	 CALI_MARK_COMM_REGION_END("ReduceBegin byGroup");
          break;
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
       {
+         CALI_MARK_COMM_REGION_BEGIN("ReduceBegin byNeighbor");
          for (int nbr = 1; nbr < nbr_send_groups.Size(); nbr++)
          {
             // In Reduce operation: send_groups <--> recv_groups
             const int num_send_groups = nbr_recv_groups.RowSize(nbr);
             if (num_send_groups > 0)
             {
+	       CALI_MARK_COMM_REGION_BEGIN("ReduceBegin byNeighbor send");
                T *buf_start = buf;
                const int *grp_list = nbr_recv_groups.GetRow(nbr);
                for (int i = 0; i < num_send_groups; i++)
@@ -992,12 +1028,14 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
                          &requests[request_counter]);
                request_marker[request_counter] = -1; // mark as send request
                request_counter++;
+	       CALI_MARK_COMM_REGION_END("ReduceBegin byNeighbor send");
             }
 
             // In Reduce operation: send_groups <--> recv_groups
             const int num_recv_groups = nbr_send_groups.RowSize(nbr);
             if (num_recv_groups > 0)
             {
+	       CALI_MARK_COMM_REGION_BEGIN("ReduceBegin byNeighbor recieve");
                const int *grp_list = nbr_send_groups.GetRow(nbr);
                int recv_size = 0;
                for (int i = 0; i < num_recv_groups; i++)
@@ -1015,9 +1053,11 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
                request_counter++;
                buf_offsets[nbr] = buf - (T*)group_buf.GetData();
                buf += recv_size;
+	       CALI_MARK_COMM_REGION_END("ReduceBegin byNeighbor recieve");
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
+	 CALI_MARK_COMM_REGION_END("ReduceBegin byNeighbor");
          break;
       }
    }
@@ -1038,6 +1078,7 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
    {
       case byGroup: // ***** Communication by groups *****
       {
+	 CALI_MARK_COMM_REGION_BEGIN("ReduceEnd byGroup");
          OpData<T> opd;
          opd.ldata = ldata;
          Array<int> group_num_req(group_ldof.Size());
@@ -1066,11 +1107,13 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
             opd.nb = gtopo.GetGroupSize(gr)-1;
             Op(opd);
          }
+	 CALI_MARK_COMM_REGION_END("ReduceEnd byGroup");
          break;
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
       {
+         CALI_MARK_COMM_REGION_BEGIN("ReduceEnd byNeighbor");
          MPI_Waitall(num_requests, requests, MPI_STATUSES_IGNORE);
 
          for (int nbr = 1; nbr < nbr_send_groups.Size(); nbr++)
@@ -1088,6 +1131,7 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
                }
             }
          }
+	 CALI_MARK_COMM_REGION_END("ReduceEnd byNeighbor");
          break;
       }
    }
