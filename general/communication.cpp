@@ -274,9 +274,10 @@ void GroupTopology::Create(ListOfIntegerSets &groups, int mpitag)
       }
    }
 
+   CALI_MARK_COMM_REGION_BEGIN("waitall");
    MPI_Waitall(send_requests.Size(), send_requests.GetData(),
                MPI_STATUSES_IGNORE);
-     
+   CALI_MARK_COMM_REGION_END("waitall");
    CALI_MARK_COMM_REGION_BEGIN("All communication");
    // debug barrier: MPI_Barrier(MyComm);
 }
