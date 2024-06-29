@@ -245,7 +245,6 @@ void GroupTopology::Create(ListOfIntegerSets &groups, int mpitag)
       {
          MPI_Irecv(buffer.GetRow(recv_row), recv_size, MPI_INT, lproc_proc[nbr],
                    mpitag, MyComm, &recv_requests[nbr-1]);
-         MFEM_COMM_REGION_END("recieve");
       }
    }
 
@@ -784,8 +783,8 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
             }
             buf += nldofs;
          }
-         MFEM_COMM_REGION_END("Bcast byGroup");
          break;
+	 MFEM_COMM_REGION_END("Bcast byGroup");
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -845,8 +844,8 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
-	 MFEM_COMM_REGION_END("Bcast byNeighbor");
          break;
+	 MFEM_COMM_REGION_END("Bcast byNeighbor");
       }
    }
 
@@ -885,9 +884,8 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
                CopyGroupFromBuffer(buf, ldata, gr, layout);
             }
          }
-	 MFEM_COMM_REGION_END("Bcast byGroup");
-
          break;
+	 MFEM_COMM_REGION_END("Bcast byGroup");
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -912,8 +910,8 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
                }
             }
          }
-	 MFEM_COMM_REGION_END("Bcast byNeighbor");
          break;
+	 MFEM_COMM_REGION_END("Bcast byNeighbor");
       }
    }
 
@@ -980,8 +978,8 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
                }
             }
          }
-	 MFEM_COMM_REGION_END("Reduce byGroup");
          break;
+	 MFEM_COMM_REGION_END("Reduce byGroup");
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -1035,8 +1033,8 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
-	 MFEM_COMM_REGION_END("Reduce byNeighbor");
          break;
+         MFEM_COMM_REGION_END("Reduce byNeighbor");
       }
    }
 
@@ -1085,8 +1083,9 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
             opd.nb = gtopo.GetGroupSize(gr)-1;
             Op(opd);
          }
-	 MFEM_COMM_REGION_END("Reduce byGroup");
          break;
+         MFEM_COMM_REGION_END("Reduce byGroup");
+
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -1109,8 +1108,9 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
                }
             }
          }
-	 MFEM_COMM_REGION_END("Reduce byNeighbor");
          break;
+         MFEM_COMM_REGION_END("Reduce byNeighbor");
+
       }
    }
 
