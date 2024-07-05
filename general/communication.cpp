@@ -27,6 +27,13 @@
 #include "globals.hpp"
 #include "annotations.hpp"
 
+#ifdef MFEM_USE_CALIPER
+
+#include <caliper/cali.h>
+#include <caliper/cali-manager.h>
+
+#endif
+
 #ifdef MFEM_USE_STRUMPACK
 #include <StrumpackConfig.hpp> // STRUMPACK_USE_PTSCOTCH, etc.
 #endif
