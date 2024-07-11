@@ -25,7 +25,7 @@
 #include "text.hpp"
 #include "sort_pairs.hpp"
 #include "globals.hpp"
-#include "annotations.hpp"
+#include "annotation.hpp"
 
 #ifdef MFEM_USE_CALIPER
 
