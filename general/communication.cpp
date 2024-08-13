@@ -791,8 +791,9 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
             }
             buf += nldofs;
          }
-         break;
 	 MFEM_COMM_REGION_END("Bcast byGroup");
+         break;
+	 
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -852,8 +853,9 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
-         break;
-	 MFEM_COMM_REGION_END("Bcast byNeighbor");
+         MFEM_COMM_REGION_END("Bcast byNeighbor");
+	 break;
+	 
       }
    }
 
@@ -892,8 +894,8 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
                CopyGroupFromBuffer(buf, ldata, gr, layout);
             }
          }
-         break;
 	 MFEM_COMM_REGION_END("Bcast byGroup");
+         break;
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -918,8 +920,8 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
                }
             }
          }
-         break;
 	 MFEM_COMM_REGION_END("Bcast byNeighbor");
+         break;
       }
    }
 
@@ -986,8 +988,9 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
                }
             }
          }
-         break;
 	 MFEM_COMM_REGION_END("Reduce byGroup");
+         break;
+	 
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -1041,8 +1044,9 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
-         break;
          MFEM_COMM_REGION_END("Reduce byNeighbor");
+	 break;
+         
       }
    }
 
@@ -1091,9 +1095,9 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
             opd.nb = gtopo.GetGroupSize(gr)-1;
             Op(opd);
          }
-         break;
-         MFEM_COMM_REGION_END("Reduce byGroup");
-
+          MFEM_COMM_REGION_END("Reduce byGroup");
+	  break;
+       
       }
 
       case byNeighbor: // ***** Communication by neighbors *****
@@ -1116,9 +1120,9 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
                }
             }
          }
-         break;
-         MFEM_COMM_REGION_END("Reduce byNeighbor");
-
+         MFEM_COMM_REGION_END("Reduce byNeighbor"); 
+	 break;
+      
       }
    }
 
