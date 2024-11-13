@@ -106,7 +106,7 @@ void GroupTopology::ProcToLProc()
 
 void GroupTopology::Create(ListOfIntegerSets &groups, int mpitag)
 {
-   MFEM_COMM_REGION_BEGIN("halo_exchange");
+   //MFEM_COMM_REGION_BEGIN("halo_exchange");
 
    groups.AsTable(group_lproc); // group_lproc = group_proc
 
@@ -278,7 +278,7 @@ void GroupTopology::Create(ListOfIntegerSets &groups, int mpitag)
 
    MPI_Waitall(send_requests.Size(), send_requests.GetData(),
                MPI_STATUSES_IGNORE);
-   MFEM_COMM_REGION_END("halo_exchange");
+   //MFEM_COMM_REGION_END("halo_exchange");
    // debug barrier: MPI_Barrier(MyComm);
 }
 
@@ -799,6 +799,8 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
       case byNeighbor: // ***** Communication by neighbors *****
       {
          MFEM_COMM_REGION_BEGIN("Bcast byNeighbor");
+         MFEM_COMM_REGION_BEGIN("halo_exchange");
+
          group_buf.SetSize(group_buf_size*sizeof(T));
          T *buf = (T *)group_buf.GetData();
          for (int nbr = 1; nbr < nbr_send_groups.Size(); nbr++)
@@ -853,6 +855,7 @@ void GroupCommunicator::BcastBegin(T *ldata, int layout) const
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
+	 MFEM_COMM_REGION_END("halo_exchange");
          MFEM_COMM_REGION_END("Bcast byNeighbor");
 	 break;
 	 
@@ -901,6 +904,7 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
       case byNeighbor: // ***** Communication by neighbors *****
       {
 	 MFEM_COMM_REGION_BEGIN("Bcast byNeighbor");
+         MFEM_COMM_REGION_BEGIN("halo_exchange");
          // copy the received data from the buffer to ldata, as it arrives
          int idx;
          while (MPI_Waitany(num_requests, requests, &idx, MPI_STATUS_IGNORE),
@@ -920,6 +924,7 @@ void GroupCommunicator::BcastEnd(T *ldata, int layout) const
                }
             }
          }
+         MFEM_COMM_REGION_END("halo_exchange");
 	 MFEM_COMM_REGION_END("Bcast byNeighbor");
          break;
       }
@@ -996,6 +1001,7 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
       case byNeighbor: // ***** Communication by neighbors *****
       {
          MFEM_COMM_REGION_BEGIN("Reduce byNeighbor");
+         MFEM_COMM_REGION_BEGIN("halo_exchange");
          for (int nbr = 1; nbr < nbr_send_groups.Size(); nbr++)
          {
             // In Reduce operation: send_groups <--> recv_groups
@@ -1044,6 +1050,7 @@ void GroupCommunicator::ReduceBegin(const T *ldata) const
             }
          }
          MFEM_ASSERT(buf - (T*)group_buf.GetData() == group_buf_size, "");
+	 MFEM_COMM_REGION_END("halo_exchange");
          MFEM_COMM_REGION_END("Reduce byNeighbor");
 	 break;
          
@@ -1103,6 +1110,7 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
       case byNeighbor: // ***** Communication by neighbors *****
       {
          MFEM_COMM_REGION_BEGIN("Reduce byNeighbor");
+         MFEM_COMM_REGION_BEGIN("halo_exchange");
          MPI_Waitall(num_requests, requests, MPI_STATUSES_IGNORE);
 
          for (int nbr = 1; nbr < nbr_send_groups.Size(); nbr++)
@@ -1120,6 +1128,7 @@ void GroupCommunicator::ReduceEnd(T *ldata, int layout,
                }
             }
          }
+	 MFEM_COMM_REGION_END("halo_exchange");
          MFEM_COMM_REGION_END("Reduce byNeighbor"); 
 	 break;
       
